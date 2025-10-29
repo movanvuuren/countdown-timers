@@ -50,9 +50,13 @@ export const CSS = `
 .bases-card .bases-card-field-value .cdw.cdw-inline,
 .bases-cards-property .bases-cards-line .cdw.cdw-inline { gap: .2rem; }
 
+.cdw.cdk-grid.cdw-soon .cdw-value { color: #d33; }
+.cdw.cdk-grid.cdw-due  .cdw-value { color: var(--background-modifier-error, #d33); }
+
+
 /* Optional states */
-.cdw.cdw-soon  .cdw-piece { color: var(--color-accent-1, var(--cdw-accent)); }
-.cdw.cdw-due   .cdw-piece { color: var(--background-modifier-error, #d33); }
+.cdw.cdw-soon .cdw-piece.cdw-piece { color: #d33; }
+.cdw.cdw-due  .cdw-piece.cdw-piece { color: var(--background-modifier-error, #d33); }
 
 /* Accessibility */
 @media (prefers-reduced-motion: reduce) {

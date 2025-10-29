@@ -41,72 +41,109 @@ export function createInlineShell(
 
 /** Update an inline shell with new values */
 export function drawInline(
-    shell: HTMLElement,
-    targetMs: number,
-    units: Unit[],
-    padClockUnits = true,
-    soonMs?: number
+  shell: HTMLElement,
+  targetMs: number,
+  units: Unit[],
+  padClockUnits = true,
+  soonMs?: number
 ) {
-    const diff = targetMs - Date.now();
-    const parts = splitUnits(diff, units);
+  const diff = targetMs - Date.now();
+  const parts = splitUnits(diff, units);
 
-    shell.querySelectorAll<HTMLElement>(".cdw-piece").forEach((sp) => {
-        const u = sp.getAttribute("data-unit") as Unit;
-        const n = parts[u];
-        const needsPad = padClockUnits && (u === "h" || u === "m" || u === "s");
-        sp.textContent = needsPad ? pad2(n) : String(n);
-    });
+  shell.querySelectorAll<HTMLElement>(".cdw-piece").forEach((sp) => {
+    const u = sp.getAttribute("data-unit") as Unit;
+    const n = parts[u];
+    const needsPad = padClockUnits && (u === "h" || u === "m" || u === "s");
+    sp.textContent = needsPad ? pad2(n) : String(n);
+  });
 
-    shell.classList.toggle("cdw-complete", diff <= 0);
-    shell.classList.toggle("cdw-due", diff <= 0);
-    if (soonMs && diff > 0) {
-        shell.classList.toggle("cdw-soon", diff <= soonMs);
-    }
+  const isDue = diff <= 0;
+  const isSoon = !!soonMs && diff > 0 && diff <= soonMs;
 
-    const aria = units.map((u) => `${parts[u]} ${u}`).join(" ");
-    shell.setAttribute("aria-label", aria);
+  shell.classList.toggle("cdw-complete", isDue);
+  shell.classList.toggle("cdw-due", isDue);
+
+  // Always set/clear soon explicitly (prevents stale 'soon' after due)
+  shell.classList.toggle("cdw-soon", isSoon);
+  if (isDue) shell.classList.remove("cdw-soon");
+
+  // Optional: expose state for quick debugging in devtools
+  shell.setAttribute("data-cdw-state", isDue ? "due" : (isSoon ? "soon" : "normal"));
+
+  const aria = units.map((u) => `${parts[u]} ${u}`).join(" ");
+  shell.setAttribute("aria-label", aria);
 }
+
 
 /** Build Markdown countdown card grid */
+
 export function renderCardGrid(
-    el: HTMLElement,
-    label: string,
-    units: Unit[],
-    getTarget: () => number | null
+  el: HTMLElement,
+  label: string,
+  units: Unit[],
+  getTarget: () => number | null,
+  opts?: { padClockUnits?: boolean; soonMs?: number }
 ) {
-    const wrap = el.createDiv({ cls: "cdw cdk-grid" });
-    const title = wrap.createDiv({ cls: "cdw-title" });
-    title.textContent = label;
+  const padClock = opts?.padClockUnits ?? true;
+  const soonMs = opts?.soonMs;
 
-    const captions: Record<Unit, string> = { w: "weeks", d: "days", h: "hours", m: "minutes", s: "seconds" };
-    const valueEls: Partial<Record<Unit, HTMLElement>> = {};
+  const wrap = el.createDiv({ cls: "cdw cdk-grid" });
+  const title = wrap.createDiv({ cls: "cdw-title" });
+  title.textContent = label;
 
-    for (const u of units) {
-        const card = wrap.createDiv({ cls: "cdw-card" });
-        const value = card.createDiv({ cls: "cdw-value" });
-        const cap = card.createDiv({ cls: "cdw-cap" });
-        cap.textContent = captions[u];
-        valueEls[u] = value;
+  const captions: Record<Unit, string> = { w: "weeks", d: "days", h: "hours", m: "minutes", s: "seconds" };
+  const valueEls: Partial<Record<Unit, HTMLElement>> = {};
+  const cardEls: Partial<Record<Unit, HTMLElement>> = {};
+
+  for (const u of units) {
+    const card = wrap.createDiv({ cls: "cdw-card" });
+    const value = card.createDiv({ cls: "cdw-value" });
+    const cap = card.createDiv({ cls: "cdw-cap" });
+    cap.textContent = captions[u];
+
+    valueEls[u] = value;
+    cardEls[u] = card;
+  }
+
+  const tick = () => {
+    const target = getTarget();
+    if (target == null) {
+      wrap.addClass("cdw-invalid");
+      for (const u of units) valueEls[u]!.textContent = "—";
+      wrap.setAttr("aria-label", `${label}: invalid date`);
+      // clear state classes
+      wrap.removeClass("cdw-soon");
+      wrap.removeClass("cdw-due");
+      wrap.removeClass("cdw-complete");
+      wrap.setAttr("data-cdw-state", "invalid");
+      return;
     }
 
-    const tick = () => {
-        const target = getTarget();
-        if (target == null) {
-            wrap.addClass("cdw-invalid");
-            for (const u of units) valueEls[u]!.textContent = "—";
-            return;
-        }
-        const diff = target - Date.now();
-        const parts = splitUnits(diff, units);
-        for (const u of units) {
-            const n = parts[u];
-            valueEls[u]!.textContent = (u === "h" || u === "m" || u === "s") ? pad2(n) : String(n);
-        }
-        wrap.toggleClass("cdw-complete", diff <= 0);
-        const aria = units.map((u) => `${parts[u]} ${captions[u]}`).join(" ");
-        wrap.setAttr("aria-label", `${label}: ${aria}`);
-    };
+    const diff = target - Date.now();
+    const parts = splitUnits(diff, units);
 
-    tick();
-    return { wrap, tick };
+    for (const u of units) {
+      const n = parts[u];
+      const needsPad = padClock && (u === "h" || u === "m" || u === "s");
+      valueEls[u]!.textContent = needsPad ? pad2(n) : String(n);
+    }
+
+    const isDue = diff <= 0;
+    const isSoon = !!soonMs && diff > 0 && diff <= soonMs;
+
+    wrap.toggleClass("cdw-complete", isDue);
+    wrap.toggleClass("cdw-due", isDue);
+    wrap.toggleClass("cdw-soon", isSoon);
+    if (isDue) wrap.removeClass("cdw-soon");
+
+    wrap.setAttr("data-cdw-state", isDue ? "due" : (isSoon ? "soon" : "normal"));
+
+    // aria label
+    const aria = units.map((u) => `${parts[u]} ${captions[u]}`).join(" ");
+    wrap.setAttr("aria-label", `${label}: ${aria}`);
+  };
+
+  tick();
+  return { wrap, tick };
 }
+
