@@ -36,7 +36,8 @@ export default class CountdownPlugin extends Plugin {
                     const m = tok.match(/^(\w+)=(.+)$/);
                     if (m) opts[m[1]] = m[2];
                 }
-                const label = opts.label ?? (key || first || "Countdown");
+                const label = (opts.label ?? "").trim();
+                //const label = opts.label ?? (key || first || "Countdown");
                 const units = parseShow(opts.show);
 
                 const getTarget = (): number | null => {
