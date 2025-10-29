@@ -1,6 +1,6 @@
 {
 	"name": "Countdown timers",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Adds countdown timers in bases (tables, cards), properties and files (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
