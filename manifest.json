@@ -2,7 +2,7 @@
   "id": "countdown-timers",
   "name": "Countdown Timers",
   "version": "0.1.0",
-  "minAppVersion": "1.6.0",
+  "minAppVersion": "1.10.0",
   "description": "Countdown to a single date pulled from note frontmatter, rendered as day/hour/minute/seconds cards.",
   "author": "Mo van Vuuren",
   "isDesktopOnly": false
