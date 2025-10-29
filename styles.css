@@ -1,0 +1,103 @@
+/* ========== Markdown ```countdown``` cards ========== */
+.cdw.cdk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: .75rem;
+  align-items: stretch;
+  padding: .25rem;
+}
+
+.cdw-title {
+  grid-column: 1 / -1;
+  font-weight: 600;
+  opacity: .8;
+  margin-bottom: .25rem;
+}
+
+.cdw-card {
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  border-radius: .6rem;
+  padding: .75rem .5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset;
+}
+
+.cdw-value {
+  font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-accent);
+  margin-bottom: .35rem;
+}
+
+.cdw-cap { font-size: .8rem; opacity: .8; }
+.cdw.cdw-complete .cdw-card { opacity: .75; }
+.cdw.cdw-invalid  .cdw-card { opacity: .5; }
+
+/* ========== Inline countdown (Bases / Properties / Reading View) ========== */
+.cdw.cdw-inline {
+  display: inline-flex;
+  gap: .2rem;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cdw-piece {
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.cdw-unit {
+  opacity: .75;
+  font-size: .9em;
+  margin-left: .1rem;
+}
+
+.cdw-sep { opacity: .4; }
+.cdw.cdw-complete { opacity: .7; }
+
+/* ========== Inside Bases cards ========== */
+.bases-card .bases-card-field-value .cdw.cdw-inline,
+.bases-cards-property .bases-cards-line .cdw.cdw-inline {
+  gap: .2rem;
+  align-items: baseline;
+}
+
+/* ========== Hide editors when not focused (so countdown is visible) ========== */
+/* Only for editable panes, not reading-view "chips" */
+.metadata-property-value.cdw-has-countdown:not(:focus-within) .metadata-input-longtext,
+.metadata-property-value.cdw-has-countdown:not(:focus-within) .metadata-link,
+.metadata-property-value.cdw-has-countdown:not(:focus-within) input.mod-date,
+.metadata-property-value.cdw-has-countdown:not(:focus-within) input.mod-datetime {
+  display: none;
+}
+
+/* ========== Slight alignment polish in tables ========== */
+.bases-table-cell.bases-metadata-value .cdw.cdw-inline {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+/* ========== Accessibility: reduced motion (if you animate later) ========== */
+@media (prefers-reduced-motion: reduce) {
+  .cdw, .cdw * { transition: none !important; animation: none !important; }
+}
+
+/* ========== Optional: critical-state coloring (soon / overdue) ========== */
+/* Add/remove these classes from JS if you want thresholds */
+.cdw.cdw-soon  .cdw-piece { color: var(--color-accent-1, var(--text-accent)); }
+.cdw.cdw-due   .cdw-piece { color: var(--background-modifier-error); }
+
+/* Hide the date input in Bases cards when we've inserted a countdown */
+.bases-cards-property .bases-cards-line.cdw-has-countdown input.mod-date,
+.bases-cards-property .bases-cards-line.cdw-has-countdown input.mod-datetime,
+.bases-cards-property .bases-cards-line.cdw-has-countdown .metadata-link {
+  display: none;
+}
