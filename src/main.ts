@@ -265,160 +265,160 @@ export default class CountdownPlugin extends Plugin {
   // ].join(","));
   /* ---------- Decorate cells ---------- */
   private scanAndDecorate(root: HTMLElement) {
-  const candidates = root.querySelectorAll<HTMLElement>([
-    // Properties (reading-view & file-properties)
-    ".metadata-property[data-property-key] > .metadata-property-value",
+    const candidates = root.querySelectorAll<HTMLElement>([
+      // Properties (reading-view & file-properties)
+      ".metadata-property[data-property-key] > .metadata-property-value",
 
-    // Bases TABLE: value cell inside column cell
-    ".bases-td[data-property] > .bases-table-cell.bases-metadata-value",
+      // Bases TABLE: value cell inside column cell
+      ".bases-td[data-property] > .bases-table-cell.bases-metadata-value",
 
-    // Bases CARDS: decorate the rendered value line so we survive reflows/virtualization
-    ".bases-cards-item .bases-cards-property[data-property] .bases-cards-line",
-  ].join(","));
+      // Bases CARDS: decorate the rendered value line so we survive reflows/virtualization
+      ".bases-cards-item .bases-cards-property[data-property] .bases-cards-line",
+    ].join(","));
 
-  candidates.forEach((host) => {
-    // Already decorated?
-    if (this.decorated.has(host)) return;
-    if (host.querySelector(".cdw.cdw-inline")) return;  // avoid :scope brittle syntax
+    candidates.forEach((host) => {
+      // Already decorated?
+      if (this.decorated.has(host)) return;
+      if (host.querySelector(".cdw.cdw-inline")) return;  // avoid :scope brittle syntax
 
-    // Skip card title (file.name)
-    const cardProp = host.closest<HTMLElement>(".bases-cards-property[data-property]");
-    if (cardProp?.getAttribute("data-property") === "file.name") return;
+      // Skip card title (file.name)
+      const cardProp = host.closest<HTMLElement>(".bases-cards-property[data-property]");
+      if (cardProp?.getAttribute("data-property") === "file.name") return;
 
-    // Resolve header/key (label-hidden safe)
-    const header = this.findHeaderTextForCell(host);
-    if (!header) return;
+      // Resolve header/key (label-hidden safe)
+      const header = this.findHeaderTextForCell(host);
+      if (!header) return;
 
-    // Decide units (columnMap → [cd:...] → hourglass marker)
-    let units: Unit[] | null = null;
+      // Decide units (columnMap → [cd:...] → hourglass marker)
+      let units: Unit[] | null = null;
 
-    for (const col in this.settings.columnMap) {
-      if (header.trim().toLowerCase() === col.trim().toLowerCase()) {
-        units = parseShow(this.settings.columnMap[col]);
-        break;
-      }
-    }
-    if (!units && this.settings.headerPattern) {
-      try {
-        const re = new RegExp(this.settings.headerPattern, "i");
-        const m = header.match(re);
-        if (m && m[1]) units = parseShow(m[1]);
-      } catch { /* ignore */ }
-    }
-    if (!units && this.settings.headerMarker) {
-      const parts = this.settings.headerMarker.split("|").map(esc);
-      const re = new RegExp(`(${parts.join("|")})`);
-      if (re.test(header)) units = parseShow("dhms");
-    }
-    if (!units) return;
-
-    // Build shell
-    const shell = document.createElement("div");
-    shell.className = "cdw cdw-inline";
-    shell.tabIndex = 0;
-    shell.addEventListener("click", (ev) => { ev.stopPropagation(); focusFirstEditorIn(host); });
-    shell.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); focusFirstEditorIn(host); }
-    });
-
-    const unitList = units as Unit[];
-    unitList.forEach((u, idx) => {
-      const piece = document.createElement("span");
-      piece.className = "cdw-piece";
-      piece.setAttribute("data-unit", u);
-      shell.appendChild(piece);
-
-      const label = document.createElement("span");
-      label.className = "cdw-unit";
-      label.textContent = u;
-      shell.appendChild(label);
-
-      if (idx < unitList.length - 1) {
-        const sep = document.createElement("span");
-        sep.className = "cdw-sep";
-        sep.textContent = " ";
-        shell.appendChild(sep);
-      }
-    });
-
-    // Insert (always at the host start)
-    host.classList.add("cdw-has-countdown");
-    host.insertBefore(shell, host.firstChild);
-    (host as any).setAttr?.("data-cdw", "1");
-
-    // Target resolver: DOM → Cards (FM via title) → Table (FM via same row file.name)
-    const getTarget = () => {
-      // 1) DOM/input (works for properties & table edit mode)
-      const v = this.extractDateText(host);
-      const fromDom = parseDateLike(v);
-      if (fromDom != null) return fromDom;
-
-      // 2) Cards: lookup FM by card title
-      const card = host.closest<HTMLElement>(".bases-cards-item");
-      if (card) {
-        const titleLine = card.querySelector<HTMLElement>(".bases-cards-property.mod-title .bases-cards-line");
-        const basename = titleLine?.textContent?.trim();
-        if (basename) {
-          const tfile = findTFileByBasename(this.app, basename);
-          if (tfile) {
-            const rawKey = this.findHeaderTextForCell(host) || "";
-            const key = this.normalizePropKeyForFM(rawKey);
-            const fm = this.app.metadataCache.getFileCache(tfile)?.frontmatter;
-            const raw = fm ? fm[key] : undefined;
-            const hit = parseDateLike(raw);
-            if (hit != null) return hit;
-          }
+      for (const col in this.settings.columnMap) {
+        if (header.trim().toLowerCase() === col.trim().toLowerCase()) {
+          units = parseShow(this.settings.columnMap[col]);
+          break;
         }
       }
-
-      // 3) Table: lookup FM by file.name in the same row
-      const row = host.closest<HTMLElement>(".bases-tr");
-      if (row) {
-        const nameEl = row.querySelector<HTMLElement>(
-          ".bases-td[data-property='file.name'] .bases-rendered-value, " +
-          ".bases-td[data-property='file.name'] a"
-        );
-        const filename = nameEl?.textContent?.trim();
-        if (filename) {
-          const tfile = findTFileByBasename(this.app, filename);
-          if (tfile) {
-            const rawKey = this.findHeaderTextForCell(host) || "";
-            const key = this.normalizePropKeyForFM(rawKey);
-            const fm = this.app.metadataCache.getFileCache(tfile)?.frontmatter;
-            const raw = fm ? fm[key] : undefined;
-            const hit = parseDateLike(raw);
-            if (hit != null) return hit;
-          }
-        }
+      if (!units && this.settings.headerPattern) {
+        try {
+          const re = new RegExp(this.settings.headerPattern, "i");
+          const m = header.match(re);
+          if (m && m[1]) units = parseShow(m[1]);
+        } catch { /* ignore */ }
       }
+      if (!units && this.settings.headerMarker) {
+        const parts = this.settings.headerMarker.split("|").map(esc);
+        const re = new RegExp(`(${parts.join("|")})`);
+        if (re.test(header)) units = parseShow("dhms");
+      }
+      if (!units) return;
 
-      return null;
-    };
-
-    // Register + live updates + first paint
-    this.decorated.set(host, { getTarget, units: unitList, label: header });
-    this.decoratedCells.add(host);
-
-    host.querySelectorAll<HTMLInputElement>("input.mod-date, input.mod-datetime")
-      .forEach(inp => {
-        inp.addEventListener("input", () => this.drawOne(host));
-        inp.addEventListener("change", () => this.drawOne(host));
+      // Build shell
+      const shell = document.createElement("div");
+      shell.className = "cdw cdw-inline";
+      shell.tabIndex = 0;
+      shell.addEventListener("click", (ev) => { ev.stopPropagation(); focusFirstEditorIn(host); });
+      shell.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); focusFirstEditorIn(host); }
       });
 
-    const longtext = host.querySelector<HTMLElement>(".metadata-input-longtext");
-    if (longtext) longtext.addEventListener("input", () => this.drawOne(host));
+      const unitList = units as Unit[];
+      unitList.forEach((u, idx) => {
+        const piece = document.createElement("span");
+        piece.className = "cdw-piece";
+        piece.setAttribute("data-unit", u);
+        shell.appendChild(piece);
 
-    const attrMo = new MutationObserver(() => this.drawOne(host));
-    attrMo.observe(host, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["data-property-longtext-value", "datetime", "value", "data-raw", "data-value"],
+        const label = document.createElement("span");
+        label.className = "cdw-unit";
+        label.textContent = u;
+        shell.appendChild(label);
+
+        if (idx < unitList.length - 1) {
+          const sep = document.createElement("span");
+          sep.className = "cdw-sep";
+          sep.textContent = " ";
+          shell.appendChild(sep);
+        }
+      });
+
+      // Insert (always at the host start)
+      host.classList.add("cdw-has-countdown");
+      host.insertBefore(shell, host.firstChild);
+      (host as any).setAttr?.("data-cdw", "1");
+
+      // Target resolver: DOM → Cards (FM via title) → Table (FM via same row file.name)
+      const getTarget = () => {
+        // 1) DOM/input (works for properties & table edit mode)
+        const v = this.extractDateText(host);
+        const fromDom = parseDateLike(v);
+        if (fromDom != null) return fromDom;
+
+        // 2) Cards: lookup FM by card title
+        const card = host.closest<HTMLElement>(".bases-cards-item");
+        if (card) {
+          const titleLine = card.querySelector<HTMLElement>(".bases-cards-property.mod-title .bases-cards-line");
+          const basename = titleLine?.textContent?.trim();
+          if (basename) {
+            const tfile = findTFileByBasename(this.app, basename);
+            if (tfile) {
+              const rawKey = this.findHeaderTextForCell(host) || "";
+              const key = this.normalizePropKeyForFM(rawKey);
+              const fm = this.app.metadataCache.getFileCache(tfile)?.frontmatter;
+              const raw = fm ? fm[key] : undefined;
+              const hit = parseDateLike(raw);
+              if (hit != null) return hit;
+            }
+          }
+        }
+
+        // 3) Table: lookup FM by file.name in the same row
+        const row = host.closest<HTMLElement>(".bases-tr");
+        if (row) {
+          const nameEl = row.querySelector<HTMLElement>(
+            ".bases-td[data-property='file.name'] .bases-rendered-value, " +
+            ".bases-td[data-property='file.name'] a"
+          );
+          const filename = nameEl?.textContent?.trim();
+          if (filename) {
+            const tfile = findTFileByBasename(this.app, filename);
+            if (tfile) {
+              const rawKey = this.findHeaderTextForCell(host) || "";
+              const key = this.normalizePropKeyForFM(rawKey);
+              const fm = this.app.metadataCache.getFileCache(tfile)?.frontmatter;
+              const raw = fm ? fm[key] : undefined;
+              const hit = parseDateLike(raw);
+              if (hit != null) return hit;
+            }
+          }
+        }
+
+        return null;
+      };
+
+      // Register + live updates + first paint
+      this.decorated.set(host, { getTarget, units: unitList, label: header });
+      this.decoratedCells.add(host);
+
+      host.querySelectorAll<HTMLInputElement>("input.mod-date, input.mod-datetime")
+        .forEach(inp => {
+          inp.addEventListener("input", () => this.drawOne(host));
+          inp.addEventListener("change", () => this.drawOne(host));
+        });
+
+      const longtext = host.querySelector<HTMLElement>(".metadata-input-longtext");
+      if (longtext) longtext.addEventListener("input", () => this.drawOne(host));
+
+      const attrMo = new MutationObserver(() => this.drawOne(host));
+      attrMo.observe(host, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-property-longtext-value", "datetime", "value", "data-raw", "data-value"],
+      });
+      this.cellObservers.set(host, attrMo);
+
+      this.drawOne(host);
     });
-    this.cellObservers.set(host, attrMo);
-
-    this.drawOne(host);
-  });
-}
+  }
 
 
 
@@ -439,20 +439,20 @@ export default class CountdownPlugin extends Plugin {
   /* ---------- Header/key resolution (label-hidden safe) ---------- */
 
   private findHeaderTextForCell(el: HTMLElement): string | null {
-  const clean = (s: string | null | undefined) =>
-    (s ?? "").trim() || null;
+    const clean = (s: string | null | undefined) =>
+      (s ?? "").trim() || null;
 
-  const prop = el.closest<HTMLElement>(".metadata-property[data-property-key]");
-  if (prop) return clean(prop.getAttribute("data-property-key"));  // "due⏳"
+    const prop = el.closest<HTMLElement>(".metadata-property[data-property-key]");
+    if (prop) return clean(prop.getAttribute("data-property-key"));  // "due⏳"
 
-  const td = el.closest<HTMLElement>(".bases-td[data-property]");
-  if (td) return clean(td.getAttribute("data-property"));          // "note.due⏳"
+    const td = el.closest<HTMLElement>(".bases-td[data-property]");
+    if (td) return clean(td.getAttribute("data-property"));          // "note.due⏳"
 
-  const cardProp = el.closest<HTMLElement>(".bases-cards-property[data-property]");
-  if (cardProp) return clean(cardProp.getAttribute("data-property")); // "note.due⏳"
+    const cardProp = el.closest<HTMLElement>(".bases-cards-property[data-property]");
+    if (cardProp) return clean(cardProp.getAttribute("data-property")); // "note.due⏳"
 
-  return null;
-}
+    return null;
+  }
 
 
   // private findHeaderTextForCell(el: HTMLElement): string | null {
